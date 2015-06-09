@@ -1,0 +1,8 @@
+#!/bin/bash
+
+KEY_FILE=${KEY_FILE:-$HOME/.s3backup.key}
+
+key=$(openssl aes-256-cbc -P -md sha1 | grep iv | cut -f2 -d=)
+echo "Your encryption key is ${key}. Saving in ~/.s3backup.key"
+echo -n ${key} > ${KEY_FILE}
+chmod 0600 ${KEY_FILE}

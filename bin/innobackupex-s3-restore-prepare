@@ -1,0 +1,91 @@
+#!/bin/bash
+# Prepares directory containing xbstream files. expects first in directory to be full backup.
+#
+# usage: innobackupex-s3-restore-prepare <dir>
+#
+set -e
+shopt -s nullglob
+# Config vars
+
+CURRENT_BACKUP_DIR=$1
+RESTORE_LOG=${CURRENT_BACKUP_DIR}/restore.log
+KEY_FILE=${KEY_FILE:-$HOME/.s3backup.key}
+
+ibex=$(which innobackupex)
+if [ $? -eq 1 ]
+then
+	echo "ERROR: Innobackupex missing, please install xtrabackup"
+	exit 1
+fi
+
+for file in $CURRENT_BACKUP_DIR/*.xbstream; do
+    filename=$(basename $file)
+    ts=$(echo $filename | cut -f1 -d'.')
+    bcp_dir=${CURRENT_BACKUP_DIR}/${ts}
+    echo "Extracting backup $filename"
+
+    if [ ! -d "$bcp_dir" ]; then
+        mkdir -p ${bcp_dir}
+        xbcrypt --encrypt-algo=AES256 --decrypt --encrypt-key-file=${KEY_FILE} < ${file} | xbstream -xC ${bcp_dir}
+    fi
+
+    ${ibex} --decompress ${bcp_dir} 2>> ${RESTORE_LOG}
+done
+
+i=0;
+backup_dirs=()
+
+for f in $(find $CURRENT_BACKUP_DIR/* -maxdepth 0 -type d -prune); do
+    backup_dirs[i++]=$f
+done
+
+if [ ${#backup_dirs[@]} -eq 0 ]; then
+	echo "Could not find any backup directories"
+	exit 0
+fi
+
+
+PS3="Select backup to restore: "
+select target_dir in ${backup_dirs[@]}; do break; done
+
+
+> ${RESTORE_LOG}
+
+if [ -n "$target_dir" ]; then
+	backup_dirs_to_process=()
+	i=0
+	for d in ${backup_dirs[@]}; do
+		backup_dirs_to_process[i++]=$d
+		if [ "$d" == "$target_dir" ]; then break; fi
+	done
+
+	full_backup=${backup_dirs_to_process[0]}
+	last_backup=${backup_dirs_to_process[-1]}
+
+	if [ ${full_backup} != ${last_backup} ]; then
+		for d in ${backup_dirs_to_process[@]}; do
+			ibex_args="--apply-log"
+
+			if [ $d != ${last_backup} ]; then
+				ibex_args+=" --redo-only"
+			fi
+
+			ibex_args+=" $full_backup"
+
+			if [ $d != ${full_backup} ]; then
+				ibex_args+=" --incremental-dir=$d"
+				message="merging incremental backup $d"
+			else
+				message="preparing full backup $d"
+			fi
+
+			echo ${message}
+			${ibex} ${ibex_args} #2>> ${RESTORE_LOG}
+		done
+	fi
+
+	echo "finalizing full backup"
+	${ibex} --apply-log ${full_backup} #2>> ${RESTORE_LOG}
+
+	echo -e "\nFull backup is ready to restore: innobackupex --copy-back $full_backup"
+fi
