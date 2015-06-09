@@ -3,7 +3,7 @@ set -e -o nounset
 # Config vars
 
 BACKUPS_DIR=${BACKUPS_DIR:-"/backups/mysql"}
-WEEK=$(date -dlast-monday +%Y-%m-%d)
+WEEK=$(date -d "$(( $(date +%u) - 1 )) days ago" +%Y-%m-%d)
 CURRENT_BACKUP_DIR=${BACKUPS_DIR}/${WEEK}
 KEY_FILE=${KEY_FILE:-$HOME/.s3backup.key}
 IBEX_BASE_ARGS="--encrypt=AES256 --encrypt-key-file=$KEY_FILE --stream=xbstream --compress --extra-lsndir=$CURRENT_BACKUP_DIR"
