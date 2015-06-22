@@ -4,6 +4,7 @@ set -e -o nounset
 
 BACKUPS_DIR=${BACKUPS_DIR:-"/backups/mysql"}
 WEEK=$(date -d "$(( $(date +%u) - 1 )) days ago" +%Y-%m-%d)
+WEEK_GREP_PATTERN="[0-9]\{4\}\-[0-9]\{2\}\-[0-9]\{2\}$"
 CURRENT_BACKUP_DIR=${BACKUPS_DIR}/${WEEK}
 KEY_FILE=${KEY_FILE:-$HOME/.s3backup.key}
 IBEX_BASE_ARGS="--encrypt=AES256 --encrypt-key-file=$KEY_FILE --stream=xbstream --compress --extra-lsndir=$CURRENT_BACKUP_DIR"
@@ -31,7 +32,7 @@ s3upload=$(which gof3r 2> /dev/null) || error_exit "gof3r missing, please instal
 
 [ -f ${KEY_FILE} ] || error_exit "innobackupex encryption key missing. expected path: $KEY_FILE"
 
-old_backups=$(ls -Q1 ${BACKUPS_DIR} | xargs readlink -f | grep '[0-9]\{6\}$' | grep -v ${WEEK} | cat)
+old_backups=$(ls -Q1 ${BACKUPS_DIR} | xargs readlink -f | grep ${WEEK_GREP_PATTERN} | grep -v ${WEEK} | cat)
 
 if [ -n "$old_backups" ]; then
     echo "Removing old backups: " ${old_backups}
