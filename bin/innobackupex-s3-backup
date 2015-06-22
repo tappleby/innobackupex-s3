@@ -32,7 +32,7 @@ s3upload=$(which gof3r 2> /dev/null) || error_exit "gof3r missing, please instal
 
 [ -f ${KEY_FILE} ] || error_exit "innobackupex encryption key missing. expected path: $KEY_FILE"
 
-old_backups=$(ls -Q1 ${BACKUPS_DIR} | xargs readlink -f | grep ${WEEK_GREP_PATTERN} | grep -v ${WEEK} | cat)
+old_backups=$(find ${BACKUPS_DIR} -type d | grep ${WEEK_GREP_PATTERN} | grep -v ${WEEK} | cat)
 
 if [ -n "$old_backups" ]; then
     echo "Removing old backups: " ${old_backups}
